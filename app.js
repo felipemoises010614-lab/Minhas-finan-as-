@@ -98,6 +98,103 @@ function valido(l) {
     && Number.isInteger(l.valor) && l.valor > 0;
 }
 
+// ---------- API na nuvem (opcional, usada pelo bot do WhatsApp) ----------
+
+const CHAVE_API = 'minhas-financas:api';
+let api = carregarConfigApi();
+
+function carregarConfigApi() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CHAVE_API));
+    return c && c.url && c.token ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+async function chamarApi(caminho, opcoes = {}, config = api) {
+  const resp = await fetch(config.url + caminho, {
+    ...opcoes,
+    headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+  });
+  if (resp.status === 401) throw new Error('Token inválido.');
+  if (!resp.ok) throw new Error(`A API respondeu com erro ${resp.status}.`);
+  return resp.status === 204 ? null : resp.json();
+}
+
+function mostrarStatusApi(texto, erro = false) {
+  const el = $('#status-api');
+  el.textContent = texto;
+  el.classList.toggle('negativo', erro);
+}
+
+let sincronizando = false;
+async function sincronizar() {
+  if (!api || sincronizando) return;
+  sincronizando = true;
+  try {
+    const dados = await chamarApi('/lancamentos');
+    lancamentos = dados.filter(valido).map(({ id, tipo, data, descricao, categoria, valor }) => ({ id, tipo, data, descricao, categoria, valor }));
+    salvar();
+    render();
+    mostrarStatusApi(`Conectado · atualizado às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+  } catch (e) {
+    mostrarStatusApi(`Sem conexão com a nuvem (${e.message}) — mostrando os dados salvos neste aparelho.`, true);
+  } finally {
+    sincronizando = false;
+  }
+}
+
+function atualizarTelaApi() {
+  $('#api-desconectada').hidden = !!api;
+  $('#api-conectada').hidden = !api;
+  if (!api) mostrarStatusApi('');
+}
+
+$('#form-api').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target.elements;
+  const config = { url: f.url.value.trim().replace(/\/+$/, ''), token: f.token.value.trim() };
+  if (!/^https:\/\//.test(config.url) || !config.token) {
+    mostrarStatusApi('Informe o endereço (começando com https://) e o token.', true);
+    return;
+  }
+  const botao = e.target.querySelector('button');
+  botao.disabled = true;
+  mostrarStatusApi('Conectando…');
+  try {
+    const remotos = await chamarApi('/lancamentos', {}, config);
+    const idsRemotos = new Set(remotos.map((l) => l.id));
+    const soLocais = lancamentos.filter((l) => !idsRemotos.has(l.id));
+    if (soLocais.length && confirm(`Enviar os ${soLocais.length} lançamento(s) deste aparelho para a nuvem?`)) {
+      await chamarApi('/lancamentos/importar', { method: 'POST', body: JSON.stringify(soLocais) }, config);
+    }
+    api = config;
+    localStorage.setItem(CHAVE_API, JSON.stringify(api));
+    f.token.value = '';
+    atualizarTelaApi();
+    await sincronizar();
+  } catch (erro) {
+    mostrarStatusApi(`Não foi possível conectar: ${erro.message}`, true);
+  } finally {
+    botao.disabled = false;
+  }
+});
+
+$('#desconectar').addEventListener('click', () => {
+  if (!confirm('Desconectar da nuvem? Os dados continuam salvos lá e também ficam neste aparelho.')) return;
+  api = null;
+  localStorage.removeItem(CHAVE_API);
+  atualizarTelaApi();
+});
+
+$('#atualizar').addEventListener('click', sincronizar);
+
+// Ao voltar para o app (ex.: depois de lançar pelo WhatsApp), busca as novidades
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') sincronizar();
+});
+
 // ---------- Formulário ----------
 
 function preencherCategorias(tipo) {
@@ -114,7 +211,7 @@ form.addEventListener('change', (e) => {
   if (e.target.name === 'tipo') preencherCategorias(tipoAtual());
 });
 
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const erro = $('#erro-form');
   const data = form.elements.data.value;
@@ -126,14 +223,19 @@ form.addEventListener('submit', (e) => {
   if (!descricao) return mostrarErro('Informe uma descrição.', form.elements.descricao);
 
   erro.textContent = '';
-  lancamentos.push({
-    id: gerarId(),
-    tipo: tipoAtual(),
-    data,
-    descricao,
-    categoria: selectCategoria.value,
-    valor,
-  });
+  const novo = { id: gerarId(), tipo: tipoAtual(), data, descricao, categoria: selectCategoria.value, valor };
+  if (api) {
+    const botao = form.querySelector('button[type=submit]');
+    botao.disabled = true;
+    try {
+      await chamarApi('/lancamentos', { method: 'POST', body: JSON.stringify(novo) });
+    } catch (falha) {
+      return mostrarErro(`Não foi possível salvar na nuvem: ${falha.message}`, botao);
+    } finally {
+      botao.disabled = false;
+    }
+  }
+  lancamentos.push(novo);
   salvar();
 
   // Mostra o mês do lançamento recém-adicionado
@@ -315,8 +417,16 @@ function renderLancamentos(doMes) {
   }
 }
 
-function excluir(l) {
+async function excluir(l) {
   if (!confirm(`Excluir "${l.descricao}" (${formatarCentavos(l.valor)})?`)) return;
+  if (api) {
+    try {
+      await chamarApi(`/lancamentos/${encodeURIComponent(l.id)}`, { method: 'DELETE' });
+    } catch (e) {
+      alert(`Não foi possível excluir na nuvem: ${e.message}`);
+      return;
+    }
+  }
   lancamentos = lancamentos.filter((x) => x.id !== l.id);
   salvar();
   render();
@@ -343,19 +453,29 @@ $('#importar').addEventListener('change', async (e) => {
   try {
     const dados = JSON.parse(await arquivo.text());
     if (!Array.isArray(dados)) throw new Error();
-    const novos = dados.filter(valido);
-    if (!novos.length) throw new Error();
+    const validos = dados.filter(valido);
+    if (!validos.length) throw new Error();
+    // Ids já existentes são do mesmo lançamento (backup importado de novo): não duplica
     const ids = new Set(lancamentos.map((l) => l.id));
-    let adicionados = 0;
-    for (const l of novos) {
-      const id = typeof l.id === 'string' && !ids.has(l.id) ? l.id : gerarId();
-      ids.add(id);
-      lancamentos.push({ ...l, id });
-      adicionados++;
+    const novos = [];
+    for (const { id, tipo, data, descricao, categoria, valor } of validos) {
+      if (ids.has(id)) continue;
+      const novo = { id: typeof id === 'string' && /^[\w-]{1,64}$/.test(id) ? id : gerarId(), tipo, data, descricao, categoria, valor };
+      ids.add(novo.id);
+      novos.push(novo);
     }
+    if (api && novos.length) {
+      try {
+        await chamarApi('/lancamentos/importar', { method: 'POST', body: JSON.stringify(novos) });
+      } catch (falha) {
+        alert(`Não foi possível enviar para a nuvem: ${falha.message}`);
+        return;
+      }
+    }
+    lancamentos.push(...novos);
     salvar();
     render();
-    alert(`${adicionados} lançamento(s) importado(s).`);
+    alert(novos.length ? `${novos.length} lançamento(s) importado(s).` : 'Esses lançamentos já estavam no app.');
   } catch {
     alert('Arquivo de backup inválido.');
   }
@@ -366,3 +486,5 @@ $('#importar').addEventListener('change', async (e) => {
 form.elements.data.value = hojeISO();
 preencherCategorias('gasto');
 render();
+atualizarTelaApi();
+sincronizar();

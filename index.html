@@ -91,7 +91,29 @@
 
     <section class="painel dados" aria-labelledby="titulo-dados">
       <h2 id="titulo-dados">Seus dados</h2>
-      <p class="nota">Os lançamentos ficam salvos só neste navegador. Exporte um backup de vez em quando.</p>
+      <p class="nota">Sem conexão com a nuvem, os lançamentos ficam salvos só neste navegador. Exporte um backup de vez em quando.</p>
+
+      <details class="nuvem" id="api-desconectada">
+        <summary>Conectar à nuvem e ao WhatsApp (opcional)</summary>
+        <form id="form-api" class="campos" novalidate>
+          <label class="campo largo">
+            <span>Endereço da API</span>
+            <input type="url" name="url" placeholder="https://minhas-financas.seu-usuario.workers.dev" autocomplete="off" inputmode="url">
+          </label>
+          <label class="campo largo">
+            <span>Token da API</span>
+            <input type="password" name="token" autocomplete="off">
+          </label>
+          <button type="submit" class="btn-secundario largo">Conectar</button>
+        </form>
+      </details>
+
+      <div id="api-conectada" class="acoes" hidden>
+        <button type="button" id="atualizar" class="btn-secundario">Atualizar agora</button>
+        <button type="button" id="desconectar" class="btn-secundario">Desconectar</button>
+      </div>
+      <p id="status-api" class="nota status" aria-live="polite"></p>
+
       <div class="acoes">
         <button type="button" id="exportar" class="btn-secundario">Exportar backup</button>
         <label class="btn-secundario">

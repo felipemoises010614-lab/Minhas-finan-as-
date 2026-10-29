@@ -284,3 +284,12 @@ input, select, button { font: inherit; }
   .campos { grid-template-columns: 1fr 1fr; }
   .grafico { grid-template-columns: auto 1fr; }
 }
+
+/* Conexão com a nuvem */
+.nuvem { margin-bottom: 12px; }
+.nuvem summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.nuvem form { margin-top: 10px; }
+.btn-secundario.largo { grid-column: 1 / -1; }
+.nota.status:empty { display: none; }
+#api-conectada { margin-bottom: 12px; }
+.nota.negativo { color: var(--negativo); }
