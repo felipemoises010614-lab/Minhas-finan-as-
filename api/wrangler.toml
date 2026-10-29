@@ -1,0 +1,14 @@
+# Configuração do Worker para publicação automática pela Cloudflare (Workers Builds).
+# Os segredos (API_TOKEN, WHATSAPP_TOKEN etc.) ficam no painel da Cloudflare, não aqui.
+name = "minhas-financas-2574"
+main = "worker.js"
+compatibility_date = "2025-10-01"
+keep_vars = true
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "minhas-financas"
+database_id = "f1bb82ce-6011-4956-b65f-d351ec8f9193"
