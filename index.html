@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="Controle de finanças pessoais: lance entradas e gastos, veja saldo e totais por categoria.">
+  <title>Minhas Finanças</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topo">
+    <h1>Minhas Finanças</h1>
+    <nav class="mes" aria-label="Selecionar mês">
+      <button type="button" id="mes-anterior" class="btn-icone" aria-label="Mês anterior">‹</button>
+      <span id="mes-atual" aria-live="polite"></span>
+      <button type="button" id="mes-seguinte" class="btn-icone" aria-label="Próximo mês">›</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="resumo" aria-label="Resumo do mês">
+      <div class="cartao">
+        <span class="rotulo">Entradas</span>
+        <strong id="total-entradas" class="valor positivo">R$ 0,00</strong>
+      </div>
+      <div class="cartao">
+        <span class="rotulo">Gastos</span>
+        <strong id="total-gastos" class="valor negativo">R$ 0,00</strong>
+      </div>
+      <div class="cartao destaque">
+        <span class="rotulo">Saldo do mês</span>
+        <strong id="saldo" class="valor">R$ 0,00</strong>
+      </div>
+    </section>
+
+    <section class="painel" aria-labelledby="titulo-form">
+      <h2 id="titulo-form">Novo lançamento</h2>
+      <form id="form-lancamento" novalidate>
+        <div class="tipo" role="radiogroup" aria-label="Tipo de lançamento">
+          <label><input type="radio" name="tipo" value="gasto" checked><span>Gasto</span></label>
+          <label><input type="radio" name="tipo" value="entrada"><span>Entrada</span></label>
+        </div>
+        <div class="campos">
+          <label class="campo">
+            <span>Data</span>
+            <input type="date" name="data" required>
+          </label>
+          <label class="campo">
+            <span>Valor (R$)</span>
+            <input type="text" name="valor" inputmode="decimal" placeholder="0,00" autocomplete="off" required>
+          </label>
+          <label class="campo largo">
+            <span>Descrição</span>
+            <input type="text" name="descricao" maxlength="80" placeholder="Ex.: Mercado" autocomplete="off" required>
+          </label>
+          <label class="campo largo">
+            <span>Categoria</span>
+            <select name="categoria" required></select>
+          </label>
+        </div>
+        <p id="erro-form" class="erro" role="alert"></p>
+        <button type="submit" class="btn-primario">Adicionar</button>
+      </form>
+    </section>
+
+    <section class="painel" aria-labelledby="titulo-grafico">
+      <h2 id="titulo-grafico">Gastos por categoria</h2>
+      <div class="grafico">
+        <svg id="grafico" viewBox="0 0 200 200" role="img" aria-labelledby="grafico-desc">
+          <desc id="grafico-desc">Gráfico de rosca dos gastos do mês por categoria</desc>
+        </svg>
+        <ul id="legenda" class="legenda"></ul>
+      </div>
+      <p id="sem-gastos" class="vazio" hidden>Nenhum gasto neste mês.</p>
+    </section>
+
+    <section class="painel" aria-labelledby="titulo-categorias">
+      <h2 id="titulo-categorias">Total por categoria</h2>
+      <ul id="lista-categorias" class="categorias"></ul>
+      <p id="sem-categorias" class="vazio" hidden>Nada lançado neste mês.</p>
+    </section>
+
+    <section class="painel" aria-labelledby="titulo-lancamentos">
+      <h2 id="titulo-lancamentos">Lançamentos do mês</h2>
+      <ul id="lista-lancamentos" class="lancamentos"></ul>
+      <p id="sem-lancamentos" class="vazio" hidden>Nenhum lançamento neste mês.</p>
+    </section>
+
+    <section class="painel dados" aria-labelledby="titulo-dados">
+      <h2 id="titulo-dados">Seus dados</h2>
+      <p class="nota">Sem conexão com a nuvem, os lançamentos ficam salvos só neste navegador. Exporte um backup de vez em quando.</p>
+
+      <details class="nuvem" id="api-desconectada">
+        <summary>Conectar à nuvem e ao WhatsApp (opcional)</summary>
+        <form id="form-api" class="campos" novalidate>
+          <label class="campo largo">
+            <span>Endereço da API</span>
+            <input type="url" name="url" placeholder="https://minhas-financas.seu-usuario.workers.dev" autocomplete="off" inputmode="url">
+          </label>
+          <label class="campo largo">
+            <span>Token da API</span>
+            <input type="password" name="token" autocomplete="off">
+          </label>
+          <button type="submit" class="btn-secundario largo">Conectar</button>
+        </form>
+      </details>
+
+      <div id="api-conectada" class="acoes" hidden>
+        <button type="button" id="atualizar" class="btn-secundario">Atualizar agora</button>
+        <button type="button" id="desconectar" class="btn-secundario">Desconectar</button>
+      </div>
+      <p id="status-api" class="nota status" aria-live="polite"></p>
+
+      <div class="acoes">
+        <button type="button" id="exportar" class="btn-secundario">Exportar backup</button>
+        <label class="btn-secundario">
+          Importar backup
+          <input type="file" id="importar" accept="application/json,.json" hidden>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
