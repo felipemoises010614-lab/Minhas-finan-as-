@@ -1,6 +1,7 @@
-# Configuração do Worker para publicação automática pela Cloudflare (Workers Builds).
+# Configuração do Worker, usada pelo workflow .github/workflows/worker.yml.
 # Os segredos (API_TOKEN, WHATSAPP_TOKEN etc.) ficam no painel da Cloudflare, não aqui.
 name = "minhas-financas-2574"
+account_id = "da8005073788de869c5802549ead1fe5"
 main = "worker.js"
 compatibility_date = "2025-10-01"
 keep_vars = true

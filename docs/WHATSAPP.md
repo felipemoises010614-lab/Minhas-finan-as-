@@ -34,10 +34,12 @@ Acesse <https://dash.cloudflare.com/sign-up> e crie uma conta gratuita.
 4. Anote o endereço do Worker, algo como `https://minhas-financas.SEU-USUARIO.workers.dev`.
    Abrindo esse endereço no navegador deve aparecer **"Minhas Finanças API está no ar ✅"**.
 
-> **Sem copiar código (bom para o celular):** em vez dos itens 3 a 4 acima, ligue o Worker ao GitHub.
-> No Worker, abra **Settings → Build → Connect**, escolha **GitHub**, o repositório `Minhas-finan-as-` e a branch `main`.
-> Em **Root directory** (ou *Path*) coloque `api` e em **Deploy command** deixe `npx wrangler deploy`. Salve.
-> A Cloudflare publica o código de `api/worker.js` sozinha, com o banco já ligado (arquivo `api/wrangler.toml`), e republica a cada mudança na `main`.
+> **Sem copiar código (bom para o celular):** o GitHub publica o Worker sozinho (`.github/workflows/worker.yml`), já com o banco ligado (`api/wrangler.toml`).
+> 1. No Worker, abra **Settings → Builds** e, em **API token for external CI/CD**, toque em **Create token**. Copie o token.
+> 2. Abra <https://github.com/felipemoises010614-lab/Minhas-finan-as-/settings/secrets/actions/new>.
+>    **Name:** `CLOUDFLARE_API_TOKEN`. **Secret:** cole o token. Toque em **Add secret**.
+> 3. Em **Actions → Publicar API na Cloudflare**, toque em **Run workflow**. Depois disso ele publica sozinho a cada mudança na pasta `api`.
+>
 > Nesse caso, pule o passo 4.
 
 ### 4. Ligue o banco ao Worker
