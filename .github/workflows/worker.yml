@@ -32,8 +32,11 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != ''
         working-directory: api
         run: |
-          # Remove espaços e quebras de linha que costumam vir junto ao copiar o token no celular
-          CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | sed 's/^[[:space:]]*Bearer[[:space:]]*//' | tr -d '[:space:]')"
+          # Aceita o token puro ou o exemplo "curl ... -H "Authorization: Bearer <token>"" inteiro,
+          # e remove espaços, aspas e quebras de linha que vêm junto ao copiar no celular
+          T="$CLOUDFLARE_API_TOKEN"
+          case "$T" in *Bearer*) T="${T##*Bearer}" ;; esac
+          CLOUDFLARE_API_TOKEN="$(printf '%s' "$T" | tr -d '[:space:]"\\')"
           export CLOUDFLARE_API_TOKEN
           echo "Token com ${#CLOUDFLARE_API_TOKEN} caracteres"
           npx -y wrangler@4 deploy
