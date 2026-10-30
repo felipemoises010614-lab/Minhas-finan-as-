@@ -31,4 +31,9 @@ jobs:
       - name: Publicar Worker
         if: env.CLOUDFLARE_API_TOKEN != ''
         working-directory: api
-        run: npx -y wrangler@4 deploy
+        run: |
+          # Remove espaços e quebras de linha que costumam vir junto ao copiar o token no celular
+          CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | sed 's/^[[:space:]]*Bearer[[:space:]]*//' | tr -d '[:space:]')"
+          export CLOUDFLARE_API_TOKEN
+          echo "Token com ${#CLOUDFLARE_API_TOKEN} caracteres"
+          npx -y wrangler@4 deploy
