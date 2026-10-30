@@ -61,7 +61,7 @@ Clique em **Deploy** para salvar.
 1. Abra o app (o link do GitHub Pages) e role até **Seus dados**.
 2. Toque em **Conectar à nuvem e ao WhatsApp**.
 3. Cole o endereço do Worker (passo 3) e o `API_TOKEN` (passo 5) e toque em **Conectar**.
-4. Se você já tinha lançamentos no app, ele pergunta se quer enviá-los para a nuvem. Responda **OK**.
+4. Se você já tinha lançamentos no app, eles são enviados para a nuvem automaticamente.
 
 Faça isso em cada aparelho em que for usar o app. A partir daqui os dados ficam na nuvem e aparecem em todos eles.
 

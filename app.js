@@ -166,7 +166,8 @@ $('#form-api').addEventListener('submit', async (e) => {
     const remotos = await chamarApi('/lancamentos', {}, config);
     const idsRemotos = new Set(remotos.map((l) => l.id));
     const soLocais = lancamentos.filter((l) => !idsRemotos.has(l.id));
-    if (soLocais.length && confirm(`Enviar os ${soLocais.length} lançamento(s) deste aparelho para a nuvem?`)) {
+    // Leva para a nuvem o que só existe neste aparelho; senão a sincronização a seguir o apagaria daqui
+    if (soLocais.length) {
       await chamarApi('/lancamentos/importar', { method: 'POST', body: JSON.stringify(soLocais) }, config);
     }
     api = config;
