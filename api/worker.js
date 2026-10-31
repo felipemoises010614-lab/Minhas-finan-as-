@@ -385,6 +385,15 @@ async function receberWebhook(request, env) {
     }
     await enviarWhatsApp(env, msg.from, resposta);
   }
+  // Situação das mensagens enviadas pelo bot (enviada, entregue, lida ou falhou, com o motivo)
+  const statuses = (payload.entry || [])
+    .flatMap((e) => e.changes || [])
+    .flatMap((c) => (c.value && c.value.statuses) || []);
+  for (const st of statuses) {
+    const erro = (st.errors || []).map((e) => `${e.code} ${e.title || ''} ${(e.error_data && e.error_data.details) || ''}`.trim()).join('; ');
+    if (st.status === 'failed') console.error('Mensagem não entregue:', erro);
+    await registrarStatus(env, st.status, erro);
+  }
   return new Response('ok');
 }
 
@@ -447,6 +456,18 @@ async function api(request, env, caminho) {
 
 // ---------- Diagnóstico do WhatsApp ----------
 
+async function registrarStatus(env, status, erro) {
+  try {
+    await env.DB.batch([
+      env.DB.prepare("CREATE TABLE IF NOT EXISTS status_envio (status TEXT, erro TEXT, em TEXT NOT NULL DEFAULT (datetime('now')))"),
+      env.DB.prepare('INSERT INTO status_envio (status, erro) VALUES (?, ?)').bind(String(status || ''), erro || null),
+      env.DB.prepare('DELETE FROM status_envio WHERE rowid NOT IN (SELECT rowid FROM status_envio ORDER BY rowid DESC LIMIT 20)'),
+    ]);
+  } catch (e) {
+    console.error('Falha ao registrar status:', e);
+  }
+}
+
 async function graph(env, metodo, caminho) {
   const versao = env.GRAPH_VERSION || 'v23.0';
   const resp = await fetch(`https://graph.facebook.com/${versao}/${caminho}`, {
@@ -472,7 +493,11 @@ async function adminWhatsApp(request, env, caminho, url) {
     const recebidas = env.DB
       ? await env.DB.prepare('SELECT COUNT(*) AS total, MAX(recebida_em) AS ultima FROM mensagens').first()
       : null;
-    return json({ configurado, numero, permitidos, recebidas });
+    const ultimosStatus = env.DB
+      ? await env.DB.prepare('SELECT status, erro, em FROM status_envio ORDER BY rowid DESC LIMIT 10').all()
+          .then((r) => r.results).catch(() => [])
+      : [];
+    return json({ configurado, numero, permitidos, recebidas, ultimosStatus });
   }
 
   // Manda uma mensagem de teste para o primeiro número permitido e devolve a resposta da Meta
