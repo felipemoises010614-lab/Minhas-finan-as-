@@ -7,6 +7,8 @@
 //   POST /lancamentos             cria um lançamento                (Bearer API_TOKEN)
 //   POST /lancamentos/importar    cria vários (ignora ids repetidos) (Bearer API_TOKEN)
 //   DELETE /lancamentos/:id       exclui um lançamento              (Bearer API_TOKEN)
+//   GET  /whatsapp/diagnostico    confere a configuração do WhatsApp (Bearer API_TOKEN)
+//   POST /whatsapp/inscrever?waba=ID  inscreve a conta do WhatsApp no app, para receber mensagens (Bearer API_TOKEN)
 //
 // Configuração (Settings → Variables and Secrets do Worker):
 //   DB               binding do banco D1
@@ -442,6 +444,41 @@ async function api(request, env, caminho) {
   return json({ erro: 'Rota não encontrada' }, 404);
 }
 
+// ---------- Diagnóstico do WhatsApp ----------
+
+async function graph(env, metodo, caminho) {
+  const versao = env.GRAPH_VERSION || 'v23.0';
+  const resp = await fetch(`https://graph.facebook.com/${versao}/${caminho}`, {
+    method: metodo,
+    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` },
+  });
+  return { status: resp.status, resposta: await resp.json().catch(() => null) };
+}
+
+async function adminWhatsApp(request, env, caminho, url) {
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
+  if (!env.API_TOKEN || !iguais(token, env.API_TOKEN)) return json({ erro: 'Token inválido' }, 401);
+
+  if (caminho === '/whatsapp/diagnostico' && request.method === 'GET') {
+    const configurado = Object.fromEntries(
+      ['DB', 'API_TOKEN', 'VERIFY_TOKEN', 'APP_SECRET', 'WHATSAPP_TOKEN', 'PHONE_NUMBER_ID', 'ALLOWED_NUMBERS'].map((k) => [k, !!env[k]])
+    );
+    const numero = env.WHATSAPP_TOKEN && env.PHONE_NUMBER_ID
+      ? await graph(env, 'GET', `${env.PHONE_NUMBER_ID}?fields=display_phone_number,verified_name`)
+      : null;
+    const permitidos = String(env.ALLOWED_NUMBERS || '').split(',').map(digitos).filter(Boolean)
+      .map((n) => n.slice(0, 4) + '*'.repeat(Math.max(n.length - 6, 0)) + n.slice(-2));
+    return json({ configurado, numero, permitidos });
+  }
+
+  const waba = url.searchParams.get('waba') || '';
+  if (caminho === '/whatsapp/inscrever' && /^\d{5,30}$/.test(waba)) {
+    if (request.method === 'POST') return json(await graph(env, 'POST', `${waba}/subscribed_apps`));
+    if (request.method === 'GET') return json(await graph(env, 'GET', `${waba}/subscribed_apps`));
+  }
+  return json({ erro: 'Rota não encontrada' }, 404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -455,6 +492,15 @@ export default {
       return ok ? new Response(url.searchParams.get('hub.challenge')) : new Response('Proibido', { status: 403 });
     }
     if (caminho === '/webhook' && request.method === 'POST') return receberWebhook(request, env);
+
+    if (caminho.startsWith('/whatsapp/')) {
+      try {
+        return await adminWhatsApp(request, env, caminho, url);
+      } catch (e) {
+        console.error(e);
+        return json({ erro: 'Erro interno' }, 500);
+      }
+    }
 
     if (caminho.startsWith('/lancamentos')) {
       try {
