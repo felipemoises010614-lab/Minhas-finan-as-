@@ -18,16 +18,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      ACCOUNT_ID: da8005073788de869c5802549ead1fe5
+      WORKER: minhas-financas-2574
     steps:
       - uses: actions/checkout@v4
       - name: Verificar token
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: |
           echo "::warning::Crie o segredo CLOUDFLARE_API_TOKEN no repositório (veja docs/WHATSAPP.md). Publicação pulada."
-      - uses: actions/setup-node@v4
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        with:
-          node-version: 22
+      # Envia o código direto pela API da Cloudflare. O wrangler deploy não serve aqui:
+      # quando as variáveis são editadas no painel, ele tenta ler a configuração do painel,
+      # e o token restrito a este Worker não tem permissão para isso.
+      # Mantenha estes valores iguais aos de api/wrangler.toml.
       - name: Publicar Worker
         if: env.CLOUDFLARE_API_TOKEN != ''
         working-directory: api
@@ -36,7 +38,22 @@ jobs:
           # e remove espaços, aspas e quebras de linha que vêm junto ao copiar no celular
           T="$CLOUDFLARE_API_TOKEN"
           case "$T" in *Bearer*) T="${T##*Bearer}" ;; esac
-          CLOUDFLARE_API_TOKEN="$(printf '%s' "$T" | tr -d '[:space:]"\\')"
-          export CLOUDFLARE_API_TOKEN
-          echo "Token com ${#CLOUDFLARE_API_TOKEN} caracteres"
-          npx -y wrangler@4 deploy
+          T="$(printf '%s' "$T" | tr -d '[:space:]"\\')"
+          cat > "$RUNNER_TEMP/metadata.json" <<'JSON'
+          {
+            "main_module": "worker.js",
+            "compatibility_date": "2025-10-01",
+            "bindings": [
+              { "type": "d1", "name": "DB", "id": "f1bb82ce-6011-4956-b65f-d351ec8f9193" }
+            ],
+            "keep_bindings": ["plain_text", "secret_text", "json"],
+            "observability": { "enabled": true }
+          }
+          JSON
+          resposta=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/$WORKER" \
+            -H "Authorization: Bearer $T" \
+            -F "metadata=@$RUNNER_TEMP/metadata.json;type=application/json" \
+            -F "worker.js=@worker.js;type=application/javascript+module")
+          echo "$resposta" | jq '{success, errors, messages}'
+          echo "$resposta" | jq -e '.success == true' > /dev/null
