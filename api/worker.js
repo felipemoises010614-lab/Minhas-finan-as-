@@ -8,6 +8,7 @@
 //   POST /lancamentos/importar    cria vários (ignora ids repetidos) (Bearer API_TOKEN)
 //   DELETE /lancamentos/:id       exclui um lançamento              (Bearer API_TOKEN)
 //   GET  /whatsapp/diagnostico    confere a configuração do WhatsApp (Bearer API_TOKEN)
+//   POST /whatsapp/teste-envio      manda uma mensagem de teste para o primeiro número permitido (Bearer API_TOKEN)
 //   POST /whatsapp/inscrever?waba=ID  inscreve a conta do WhatsApp no app, para receber mensagens (Bearer API_TOKEN)
 //
 // Configuração (Settings → Variables and Secrets do Worker):
@@ -468,7 +469,28 @@ async function adminWhatsApp(request, env, caminho, url) {
       : null;
     const permitidos = String(env.ALLOWED_NUMBERS || '').split(',').map(digitos).filter(Boolean)
       .map((n) => n.slice(0, 4) + '*'.repeat(Math.max(n.length - 6, 0)) + n.slice(-2));
-    return json({ configurado, numero, permitidos });
+    const recebidas = env.DB
+      ? await env.DB.prepare('SELECT COUNT(*) AS total, MAX(recebida_em) AS ultima FROM mensagens').first()
+      : null;
+    return json({ configurado, numero, permitidos, recebidas });
+  }
+
+  // Manda uma mensagem de teste para o primeiro número permitido e devolve a resposta da Meta
+  if (caminho === '/whatsapp/teste-envio' && request.method === 'POST') {
+    const para = String(env.ALLOWED_NUMBERS || '').split(',').map(digitos).filter(Boolean)[0];
+    if (!para) return json({ erro: 'ALLOWED_NUMBERS vazio' }, 400);
+    const versao = env.GRAPH_VERSION || 'v23.0';
+    const tentativas = [];
+    for (const numero of variantesBR(para)) {
+      const resp = await fetch(`https://graph.facebook.com/${versao}/${env.PHONE_NUMBER_ID}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: numero, type: 'text', text: { body: '🔧 Teste do Minhas Finanças: o bot consegue te enviar mensagens.' } }),
+      });
+      tentativas.push({ status: resp.status, resposta: await resp.json().catch(() => null) });
+      if (resp.ok) break;
+    }
+    return json(tentativas);
   }
 
   const waba = url.searchParams.get('waba') || '';
