@@ -1,4 +1,5 @@
-# Configuração do Worker, usada pelo workflow .github/workflows/worker.yml.
+# Configuração do Worker (útil para rodar o wrangler localmente).
+# A publicação automática (.github/workflows/worker.yml) repete estes valores: mantenha os dois iguais.
 # Os segredos (API_TOKEN, WHATSAPP_TOKEN etc.) ficam no painel da Cloudflare, não aqui.
 name = "minhas-financas-2574"
 account_id = "da8005073788de869c5802549ead1fe5"
